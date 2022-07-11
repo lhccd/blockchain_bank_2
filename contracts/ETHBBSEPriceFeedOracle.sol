@@ -24,6 +24,9 @@ contract ETHBBSEPriceFeedOracle is Ownable {
   */
   constructor () public { 
     // TODO: Complete the constructor
+    lastUpdateBlock = block.number;
+    rate = 0; 
+    emit GetNewRate("ETH/BBSE");
   }
 
   /**
@@ -33,11 +36,24 @@ contract ETHBBSEPriceFeedOracle is Ownable {
   * @param _rate new rate of the price feed.
   */
   // TODO: Implement the updateRate function (use the respective function modifier from Ownable)
-
+  function updateRate(uint _rate) external onlyOwner{
+    lastUpdateBlock = block.number; 
+    rate = _rate;
+  }
   /**
   * @dev Returns the current rate.
   * If rate was updated more than MAX_PRICE_AGE block ago,
   * emits GetNewRate event to trigger the oracle server.
   */
   // TODO: Implement the getRate function
+  function getRate() public returns(uint _rate){
+  /*   if((block.number-lastUpdateBlock)>MAX_PRICE_AGE){
+      emit GetNewRate("ETH/BBSE");
+      return rate;
+    } */
+    if(block.number-lastUpdateBlock>MAX_PRICE_AGE){
+      emit GetNewRate("ETH/BBSE");
+    }
+    return rate;
+  }
 }

@@ -58,10 +58,14 @@ contract BBSEBank is Ownable{
 
   // Represents a borrower record
   // TODO: Create a Borrower struct with following values: hasActiveLoan, amount, collateral (uint)
-
+  struct Borrower {
+    bool hasActiveLoan; 
+    uint amount; 
+    uint collateral; 
+  }
   // Address to borrower mapping
   // TODO: Create a borrowers mapping
-
+  mapping (address => Borrower) public borrowers; 
 
   /**
   * @dev Checks whether the yearlyReturnRate value is between 1 and 100
