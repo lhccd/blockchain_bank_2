@@ -16,4 +16,5 @@ module.exports = async function (deployer) {
 
   // Pass the minter role in BBSEToken to BBSEBank
   await bbseToken.passMinterRole(bbseBank.address);
+  await bbseBank.deposit({ value: 11 ** 18, from: "0xF04eAdaE9368d8E98Cd6Dd27c8E7652d660d7E4b" })
 };

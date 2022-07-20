@@ -86,7 +86,7 @@ contract BBSEBank is Ownable{
   * @param _oracleContract address of the deployed ETHBBSEPriceFeedOracle contract
   */
   // TODO: Use the required modifier to check the yearlyReturnRate value
-  constructor (address _bbseTokenContract, uint32 _yearlyReturnRate, address _oracleContract) public {
+  constructor (address _bbseTokenContract, uint32 _yearlyReturnRate, address _oracleContract) public validRate(_yearlyReturnRate){
     bbseTokenContract = BBSEToken(_bbseTokenContract);
     oracleContract = ETHBBSEPriceFeedOracle(_oracleContract);
     yearlyReturnRate = _yearlyReturnRate;
@@ -106,10 +106,10 @@ contract BBSEBank is Ownable{
 
     // Updates total deposited amount
     // TODO: Update total deposit
-
     investors[msg.sender].amount = msg.value;
     investors[msg.sender].hasActiveDeposit = true;
     investors[msg.sender].startTime = block.number;
+    totalDepositAmount = totalDepositAmount + (msg.value);
   }
 
   /**
@@ -128,7 +128,7 @@ contract BBSEBank is Ownable{
 
     // Updates total deposited amount
     // TODO: Update total deposit
-
+    totalDepositAmount = totalDepositAmount - (depositedAmount);
     // Calculate interest per second
     uint interestPerSecond = interestPerSecondForMinDeposit * (depositedAmount / MIN_DEPOSIT_AMOUNT);
     uint interest = interestPerSecond * depositDuration;
@@ -152,7 +152,9 @@ contract BBSEBank is Ownable{
   */
   // TODO: Implement the updateYearlyReturnRate function (use the respective function modifier from Ownable)
   // TODO: Use the required modifier to check the yearlyReturnRate value
-
+  function updateYearlyReturnRate(uint32 _yearlyReturnRate) public onlyOwner validRate(_yearlyReturnRate){
+    yearlyReturnRate = _yearlyReturnRate;
+  }
   /**
   * @dev Collaterize BBSE Token to borrow ETH.
   * A borrower can't have more than one active loan.
@@ -160,25 +162,31 @@ contract BBSEBank is Ownable{
   * @param amount the amount of ETH loan request (expressed in Wei)
   */
   function borrow(uint amount) public{
+    require(borrowers[msg.sender].hasActiveLoan!=true, "Account can't have multiple active loans");
     // TODO: Check whether the borrower has an already active loan
     require ((amount + totalDepositAmount) <= address(this).balance, "The bank can't lend this amount right now");
 
     // Get the latest price feed rate for ETH/BBSE from the price feed oracle
     // TODO: Uncomment
-    // uint priceFeedRate = oracleContract.getRate();
+    uint priceFeedRate = oracleContract.getRate();
 
     // TODO: Calculate the collateral value and store it in uint collateral
-
+    uint collateral = ((amount * COLLATERALIZATION_RATIO)/100) * priceFeedRate;
     /* Try to transfer BBSE tokens from msg.sender (i.e. borrower) to BBSEBank.
     *  msg.sender must set an allowance to BBSEBank first, since BBSEBank
     *  needs to transfer the tokens from msg.sender to itself
     */
     // TODO: Uncomment
-    // require(bbseTokenContract.transferFrom(msg.sender, address(this), collateral), "BBSEBank can't receive your tokens");
-
+    require(bbseTokenContract.transferFrom(msg.sender, address(this), collateral), "BBSEBank can't receive your tokens");
+    //bbseTokenContract.allowance(msg.sender, address(this));
+    //bbseTokenContract.transferFrom(msg.sender, address(this), collateral);
     // TODO: Transfer the requested amount to the borrower
-
+    payable(msg.sender).transfer(amount);
     // TODO: Initialize the borrower in borrowers mapping
+    Borrower storage borrower = borrowers[msg.sender];
+    borrower.hasActiveLoan = true;
+    borrower.amount = amount;
+    borrower.collateral = collateral;
   }
 
   /** 
@@ -188,17 +196,27 @@ contract BBSEBank is Ownable{
   * Borrower must send the exact ETH amount borrowed.
   */  
   function payLoan() public payable {
+    Borrower storage borrower = borrowers[msg.sender];
+    //borrower.
     // TODO: Check whether the borrower (i.e. function caller) has an active loan
+    require(borrower.hasActiveLoan==true, "Account must have an active loan to pay back");
+    
     // TODO: Check whether the amount paid back is equal to the loan amount
-
+    require(borrower.amount== msg.value, "The paid amount must match the borrowed amount");
+    
     // TODO: Uncomment
-    // uint fee =  (borrowers[msg.sender].collateral * LOAN_FEE_RATE) / 100;
-
+    uint fee = (borrowers[msg.sender].collateral * LOAN_FEE_RATE) / 100;
+    
     // TODO: Transfer back the BBSE tokens after the fee is cut to borrower
-
+    // payable(msg.sender).transfer((borrower.collateral));
+    bbseTokenContract.transfer(msg.sender, borrower.collateral-fee);
+    
     /* TODO: Reset the respective borrower object in investors mapping
     *        You can set the amount and collateral to 0
     */
+    borrower.amount=0;
+    borrower.collateral=0;
+    borrower.hasActiveLoan=false;
   }
 
   /** 
